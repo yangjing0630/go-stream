@@ -1,5 +1,5 @@
 // Copyright 2020, Chef.  All rights reserved.
-// https://github.com/q191201771/lal
+// https://github.com/yangjing0630/go-stream
 //
 // Use of this source code is governed by a MIT-style license
 // that can be found in the License file.
@@ -11,11 +11,11 @@ package hls
 import (
 	"encoding/hex"
 
-	"github.com/q191201771/lal/pkg/aac"
-	"github.com/q191201771/lal/pkg/avc"
-	"github.com/q191201771/lal/pkg/base"
-	"github.com/q191201771/lal/pkg/hevc"
-	"github.com/q191201771/lal/pkg/mpegts"
+	"github.com/yangjing0630/go-stream/pkg/aac"
+	"github.com/yangjing0630/go-stream/pkg/avc"
+	"github.com/yangjing0630/go-stream/pkg/base"
+	"github.com/yangjing0630/go-stream/pkg/hevc"
+	"github.com/yangjing0630/go-stream/pkg/mpegts"
 	"github.com/q191201771/naza/pkg/bele"
 	"github.com/q191201771/naza/pkg/nazalog"
 	"github.com/q191201771/naza/pkg/nazastring"

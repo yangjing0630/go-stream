@@ -1,5 +1,5 @@
 // Copyright 2021, Chef.  All rights reserved.
-// https://github.com/q191201771/lal
+// https://github.com/yangjing0630/go-stream
 //
 // Use of this source code is governed by a MIT-style license
 // that can be found in the License file.
@@ -12,8 +12,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/q191201771/lal/pkg/base"
-	"github.com/q191201771/lal/pkg/rtmp"
+	"github.com/yangjing0630/go-stream/pkg/base"
+	"github.com/yangjing0630/go-stream/pkg/rtmp"
 )
 
 // 检查远端rtmp流是否能正常拉取

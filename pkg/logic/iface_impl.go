@@ -1,5 +1,5 @@
 // Copyright 2021, Chef.  All rights reserved.
-// https://github.com/q191201771/lal
+// https://github.com/yangjing0630/go-stream
 //
 // Use of this source code is governed by a MIT-style license
 // that can be found in the License file.
@@ -9,13 +9,13 @@
 package logic
 
 import (
-	"github.com/q191201771/lal/pkg/base"
-	"github.com/q191201771/lal/pkg/hls"
-	"github.com/q191201771/lal/pkg/httpflv"
-	"github.com/q191201771/lal/pkg/httpts"
-	"github.com/q191201771/lal/pkg/remux"
-	"github.com/q191201771/lal/pkg/rtmp"
-	"github.com/q191201771/lal/pkg/rtsp"
+	"github.com/yangjing0630/go-stream/pkg/base"
+	"github.com/yangjing0630/go-stream/pkg/hls"
+	"github.com/yangjing0630/go-stream/pkg/httpflv"
+	"github.com/yangjing0630/go-stream/pkg/httpts"
+	"github.com/yangjing0630/go-stream/pkg/remux"
+	"github.com/yangjing0630/go-stream/pkg/rtmp"
+	"github.com/yangjing0630/go-stream/pkg/rtsp"
 )
 
 // TODO(chef) add base.HttpSubSession

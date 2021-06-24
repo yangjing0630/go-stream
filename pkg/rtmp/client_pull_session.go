@@ -1,5 +1,5 @@
 // Copyright 2019, Chef.  All rights reserved.
-// https://github.com/q191201771/lal
+// https://github.com/yangjing0630/go-stream
 //
 // Use of this source code is governed by a MIT-style license
 // that can be found in the License file.
@@ -9,7 +9,7 @@
 package rtmp
 
 import (
-	"github.com/q191201771/lal/pkg/base"
+	"github.com/yangjing0630/go-stream/pkg/base"
 )
 
 type OnReadRtmpAvMsg func(msg base.RtmpMsg)
