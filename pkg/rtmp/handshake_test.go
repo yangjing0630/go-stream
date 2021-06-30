@@ -1,11 +1,3 @@
-// Copyright 2019, Chef.  All rights reserved.
-// https://github.com/yangjing0630/go-stream
-//
-// Use of this source code is governed by a MIT-style license
-// that can be found in the License file.
-//
-// Author: Chef (191201771@qq.com)
-
 package rtmp_test
 
 import (
@@ -13,8 +5,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	. "github.com/yangjing0630/go-stream/pkg/rtmp"
 	"github.com/q191201771/naza/pkg/assert"
+	. "github.com/yangjing0630/go-stream/pkg/rtmp"
 )
 
 func TestHandshakeServerCase(t *testing.T) {

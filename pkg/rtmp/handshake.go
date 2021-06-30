@@ -23,6 +23,7 @@ import (
 )
 
 // https://pengrl.com/p/20027
+//rtmp握手分两个模式：简单模式、复杂模式 [c0和s0都是1字节 c1和c2和s1和s2都是1536字节]
 
 const version = uint8(3)
 

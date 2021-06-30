@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strings"
 	"time"
@@ -19,39 +21,48 @@ import (
 // - 存储成flv文件
 // - 拉取HTTP-FLV流进行分析参见另外一个demo：analyseflvts
 
-var _dir="temp/"
+var _dir = "temp/"
+var _m = make(chan bool)
 
-func isExistDir(dir string)(bool,error)  {
-	_,err:=os.Stat(dir)
-	if err==nil{
-		return true,nil
+func isExistDir(dir string) (bool, error) {
+	_, err := os.Stat(dir)
+	if err == nil {
+		return true, nil
 	}
-	if os.IsNotExist(err){
+	if os.IsNotExist(err) {
 		return false, err
 	}
 	return false, err
 }
 
-func autoDir(dir string)  {
-	if exist,_:=isExistDir(dir);exist{
+func autoDir(dir string) {
+	if exist, _ := isExistDir(dir); exist {
 		return
 	}
-	err:=os.MkdirAll(dir,0777)
+	err := os.MkdirAll(dir, 0777)
 	fmt.Println(err)
 }
 
 func main() {
-	f,url,isStore := parseFlag()
-	fps:=strings.Split(_dir+f,"/")
+
+	f, url, isStore, gNum := parseFlag()
+
+	fps := strings.Split(_dir+f, "/")
 	var path string
-	for i:=0;i<len(fps)-1;i++{
-		path+=fps[i]+"/"
+	for i := 0; i < len(fps)-1; i++ {
+		path += fps[i] + "/"
 	}
 	autoDir(path)
-	pullFlv(_dir+f,url,isStore)
+	for i := 0; i < gNum; i++ {
+		go func(currentI int) {
+			pullFlv(fmt.Sprintf("%s%d_%s", _dir, currentI, f), url, isStore)
+		}(i)
+	}
+
+	http.ListenAndServe("0.0.0.0:6060", nil)
 }
 
-func pullFlv(filename,url string,isStore bool){
+func pullFlv(filename, url string, isStore bool) {
 	var err error
 	_ = nazalog.Init(func(option *nazalog.Option) {
 		option.AssertBehavior = nazalog.AssertFatal
@@ -61,7 +72,7 @@ func pullFlv(filename,url string,isStore bool){
 	session := httpflv.NewPullSession()
 	var httpFlvWriter httpflv.FlvFileWriter
 
-	if isStore{
+	if isStore {
 		err = httpFlvWriter.Open(filename)
 		nazalog.Assert(nil, err)
 		defer httpFlvWriter.Dispose()
@@ -69,8 +80,8 @@ func pullFlv(filename,url string,isStore bool){
 		nazalog.Assert(nil, err)
 	}
 	err = session.Pull(url, func(tag httpflv.Tag) {
-		if isStore{
-			err:=httpFlvWriter.WriteTag(tag)
+		if isStore {
+			err := httpFlvWriter.WriteTag(tag)
 			nazalog.Assert(nil, err)
 		}
 		switch tag.Header.Type {
@@ -81,23 +92,26 @@ func pullFlv(filename,url string,isStore bool){
 		}
 	})
 	nazalog.Assert(nil, err)
-	err = <-session.WaitChan()
+	if err = <-session.WaitChan(); err != nil {
+		_m <- true
+	}
 	nazalog.Assert(nil, err)
 }
 
-func parseFlag() (f,utl string,iStore bool) {
+func parseFlag() (f, utl string, iStore bool, num int) {
 	url := flag.String("i", "", "specify http-flv url")
-	filename:=flag.String("f","","flv filename")
-	isStore:=flag.Bool("s",false,"is store")
+	filename := flag.String("f", "", "flv filename")
+	isStore := flag.Bool("s", false, "is store")
+	n := flag.Int("n", 1, "goroutine number")
 	flag.Parse()
-	f=*filename
+	f = *filename
 	if *url == "" {
 		flag.Usage()
 		base.OsExitAndWaitPressIfWindows(1)
 	}
-	if *filename==""{
-		fs:=strings.Split(*url,"/")
-		f=fmt.Sprintf("%d_%s",time.Now().Unix(),fs[len(fs)-1])
+	if *filename == "" {
+		fs := strings.Split(*url, "/")
+		f = fmt.Sprintf("%d_%s", time.Now().Unix(), fs[len(fs)-1])
 	}
-	return strings.TrimLeft(f,"/"),*url,*isStore
+	return strings.TrimLeft(f, "/"), *url, *isStore, *n
 }

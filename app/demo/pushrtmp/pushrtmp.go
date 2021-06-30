@@ -1,11 +1,3 @@
-// Copyright 2019, Chef.  All rights reserved.
-// https://github.com/yangjing0630/go-stream
-//
-// Use of this source code is governed by a MIT-style license
-// that can be found in the License file.
-//
-// Author: Chef (191201771@qq.com)
-
 package main
 
 import (
@@ -18,13 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yangjing0630/go-stream/pkg/base"
-
-	"github.com/yangjing0630/go-stream/pkg/remux"
-
-	"github.com/yangjing0630/go-stream/pkg/httpflv"
-	"github.com/yangjing0630/go-stream/pkg/rtmp"
 	"github.com/q191201771/naza/pkg/nazalog"
+	"github.com/yangjing0630/go-stream/pkg/base"
+	"github.com/yangjing0630/go-stream/pkg/httpflv"
+	"github.com/yangjing0630/go-stream/pkg/remux"
+	"github.com/yangjing0630/go-stream/pkg/rtmp"
 )
 
 // RTMP推流客户端，读取本地FLV文件，使用RTMP协议推送出去
@@ -95,6 +85,7 @@ func push(tags []httpflv.Tag, urls []string, isRecursive bool) {
 	var err error
 
 	for i := range urls {
+		//NewPushSession 初始化拉流信息，定义c0c1等
 		ps := rtmp.NewPushSession(func(option *rtmp.PushSessionOption) {
 			option.PushTimeoutMs = 5000
 			option.WriteAvTimeoutMs = 10000
@@ -222,6 +213,7 @@ func check(sessionList []*rtmp.PushSession) {
 	}
 }
 
+//压测、解析推流地址{i}
 func collect(urlTmpl string, num int) (urls []string) {
 	for i := 0; i < num; i++ {
 		url := strings.Replace(urlTmpl, "{i}", strconv.Itoa(i), -1)

@@ -113,7 +113,7 @@ func NewClientSession(t ClientSessionType, modOptions ...ModClientSessionOption)
 			StartTime: time.Now().Format("2006-01-02 15:04:05.999"),
 		},
 		debugLogReadUserCtrlMsgMax: 5,
-		hc: hc,
+		hc:                         hc,
 	}
 	nazalog.Infof("[%s] lifecycle new rtmp ClientSession. session=%p", uk, s)
 	return s
@@ -236,6 +236,8 @@ func (s *ClientSession) doContext(ctx context.Context, rawUrl string) error {
 			errChan <- err
 			return
 		}
+
+		//RTMP协议传输时会对数据做自己的格式化，这种格式的消息我们称之为rtmp message
 
 		nazalog.Infof("[%s] > W SetChunkSize %d.", s.uniqueKey, LocalChunkSize)
 		if err := s.packer.writeChunkSize(s.conn, LocalChunkSize); err != nil {
