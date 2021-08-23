@@ -1,11 +1,3 @@
-// Copyright 2020, Chef.  All rights reserved.
-// https://github.com/yangjing0630/go-stream
-//
-// Use of this source code is governed by a MIT-style license
-// that can be found in the License file.
-//
-// Author: Chef (191201771@qq.com)
-
 package main
 
 import (
@@ -82,7 +74,7 @@ func main() {
 				nazalog.Error(err)
 				return
 			}
-			//nazalog.Debugf("\n-----m3u8-----\n%s", string(content))
+			nazalog.Debugf("\n-----m3u8-----\n%s", string(content))
 
 			currFrags := parseM3u8(string(content))
 			//nazalog.Debugf("%+v", currFrags)

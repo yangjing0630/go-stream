@@ -22,9 +22,9 @@ import (
 
 	"github.com/yangjing0630/go-stream/pkg/base"
 
+	"github.com/q191201771/naza/pkg/nazalog"
 	"github.com/yangjing0630/go-stream/pkg/httpflv"
 	"github.com/yangjing0630/go-stream/pkg/rtmp"
-	"github.com/q191201771/naza/pkg/nazalog"
 )
 
 // RTMP拉流客户端，从远端服务器拉取RTMP流，存储为本地FLV文件
