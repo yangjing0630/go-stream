@@ -1,11 +1,3 @@
-// Copyright 2020, Chef.  All rights reserved.
-// https://github.com/yangjing0630/go-stream
-//
-// Use of this source code is governed by a MIT-style license
-// that can be found in the License file.
-//
-// Author: Chef (191201771@qq.com)
-
 package hls
 
 import (
@@ -13,7 +5,8 @@ import (
 )
 
 type Fragment struct {
-	fp filesystemlayer.IFile
+	fp       filesystemlayer.IFile
+	filename string
 }
 
 func (f *Fragment) OpenFile(filename string) (err error) {
@@ -21,6 +14,7 @@ func (f *Fragment) OpenFile(filename string) (err error) {
 	if err != nil {
 		return
 	}
+	f.filename = filename
 	return
 }
 
@@ -31,4 +25,8 @@ func (f *Fragment) WriteFile(b []byte) (err error) {
 
 func (f *Fragment) CloseFile() error {
 	return f.fp.Close()
+}
+
+func (f *Fragment) FileName() string {
+	return f.filename
 }

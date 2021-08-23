@@ -1,11 +1,3 @@
-// Copyright 2020, Chef.  All rights reserved.
-// https://github.com/yangjing0630/go-stream
-//
-// Use of this source code is governed by a MIT-style license
-// that can be found in the License file.
-//
-// Author: Chef (191201771@qq.com)
-
 package hls
 
 import (
@@ -13,11 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yangjing0630/go-stream/pkg/mpegts"
-
-	"github.com/yangjing0630/go-stream/pkg/base"
-
 	"github.com/q191201771/naza/pkg/nazalog"
+	"github.com/yangjing0630/go-stream/pkg/base"
+	"github.com/yangjing0630/go-stream/pkg/mpegts"
 )
 
 // TODO chef: 转换TS流的功能（通过回调供httpts使用）也放在了Muxer中，好处是hls和httpts可以共用一份TS流。
@@ -45,6 +35,7 @@ type MuxerConfig struct {
 	// 2 推流过程中，持续删除过期的ts文件，只保留最近的<fragment_num> * 2个左右的ts文件
 	// TODO chef: lalserver的模式1的逻辑是在上层做的，应该重构到hls模块中
 	CleanupMode int `json:"cleanup_mode"`
+	enableMinio bool
 }
 
 const (
@@ -81,6 +72,9 @@ type Muxer struct {
 
 	streamer *Streamer
 	patpmt   []byte
+
+	minioWriter *mpegts.MinioWriter
+	enableMinio bool
 }
 
 // 记录fragment的一些信息，注意，写m3u8文件时可能还需要用到历史fragment的信息
@@ -101,6 +95,18 @@ func NewMuxer(streamName string, enable bool, config *MuxerConfig, observer Muxe
 	playlistFilenameBak := fmt.Sprintf("%s.bak", playlistFilename)
 	recordPlaylistFilenameBak := fmt.Sprintf("%s.bak", recordPlaylistFilename)
 	frags := make([]fragmentInfo, 2*config.FragmentNum+1)
+	var minioClient *mpegts.MinioWriter
+	if config.enableMinio {
+		minio := mpegts.MinioWriter{
+			EndPoint:        "localhost:9000",
+			AccessKeyID:     "D79EOIMUK31YVNLGFAX9",
+			SecretAccessKey: "Pt+lvEfcricNF1umX9X7PkCwMBvWqWPmdqc5fxqK",
+			UseSSL:          false,
+		}
+		if err := minio.NewMinio(); err != nil {
+			config.enableMinio = false
+		}
+	}
 	m := &Muxer{
 		UniqueKey:                 uk,
 		streamName:                streamName,
@@ -109,14 +115,16 @@ func NewMuxer(streamName string, enable bool, config *MuxerConfig, observer Muxe
 		playlistFilenameBak:       playlistFilenameBak,
 		recordPlayListFilename:    recordPlaylistFilename,
 		recordPlayListFilenameBak: recordPlaylistFilenameBak,
-		enable:   enable,
-		config:   config,
-		observer: observer,
-		frags:    frags,
+		enable:                    enable,
+		config:                    config,
+		observer:                  observer,
+		frags:                     frags,
+		minioWriter:               minioClient,
+		enableMinio:               config.enableMinio,
 	}
 	streamer := NewStreamer(m)
 	m.streamer = streamer
-	nazalog.Infof("[%s] lifecycle new hls muxer. muxer=%p, streamName=%s", uk, m, streamName)
+	nazalog.Infof("[%s] lifecycle new hls muxer. muxer=%p, streamName=%s,playListFilename=%s,playlistFilenameBak=%s", uk, m, streamName, m.playlistFilename, m.playlistFilenameBak)
 	return m
 }
 
@@ -141,7 +149,9 @@ func (m *Muxer) FeedRtmpMessage(msg base.RtmpMsg) {
 
 func (m *Muxer) OnPatPmt(b []byte) {
 	m.patpmt = b
-	m.observer.OnPatPmt(b)
+	if m.observer != nil {
+		m.observer.OnPatPmt(b)
+	}
 }
 
 func (m *Muxer) OnFrame(streamer *Streamer, frame *mpegts.Frame) {
@@ -314,11 +324,24 @@ func (m *Muxer) closeFragment(isLast bool) error {
 	}
 
 	if m.enable {
-		if err := m.fragment.CloseFile(); err != nil {
+		var (
+			err error
+		)
+		filename := m.fragment.filename
+		nazalog.Debugf("enableMinio is %v", m.enableMinio)
+		if m.enableMinio {
+			err = m.minioWriter.FPutObject(filename, filename)
+		}
+		if err == nil {
+			err = m.fragment.CloseFile()
+		}
+		if m.enableMinio && err == nil {
+			err = fslCtx.Remove(filename)
+		}
+		if err != nil {
 			return err
 		}
 	}
-
 	m.opened = false
 
 	// 更新序号，为下个分片做准备
@@ -361,8 +384,15 @@ func (m *Muxer) writeRecordPlaylist(isLast bool) {
 	}
 
 	fragLines := fmt.Sprintf("#EXTINF:%.3f,\n%s\n", currFrag.duration, currFrag.filename)
-
-	content, err := fslCtx.ReadFile(m.recordPlayListFilename)
+	var (
+		content []byte
+		err     error
+	)
+	if m.enableMinio {
+		content, err = m.minioWriter.ReadFile(m.recordPlayListFilename)
+	} else {
+		content, err = fslCtx.ReadFile(m.recordPlayListFilename)
+	}
 	if err == nil {
 		// m3u8文件已经存在
 
@@ -396,9 +426,14 @@ func (m *Muxer) writeRecordPlaylist(isLast bool) {
 
 		content = buf.Bytes()
 	}
-
-	if err := writeM3u8File(content, m.recordPlayListFilename, m.recordPlayListFilenameBak); err != nil {
-		nazalog.Errorf("[%s] write record m3u8 file error. err=%+v", m.UniqueKey, err)
+	if m.enableMinio {
+		if err := m.minioWriter.Write(m.recordPlayListFilename, content); err != nil {
+			nazalog.Errorf("[%s] write live m3u8 file error. err=%+v", m.UniqueKey, err)
+		}
+	} else {
+		if err := writeM3u8File(content, m.recordPlayListFilename, m.recordPlayListFilenameBak); err != nil {
+			nazalog.Errorf("[%s] write record m3u8 file error. err=%+v", m.UniqueKey, err)
+		}
 	}
 }
 
@@ -437,9 +472,14 @@ func (m *Muxer) writePlaylist(isLast bool) {
 	if isLast {
 		buf.WriteString("#EXT-X-ENDLIST\n")
 	}
-
-	if err := writeM3u8File(buf.Bytes(), m.playlistFilename, m.playlistFilenameBak); err != nil {
-		nazalog.Errorf("[%s] write live m3u8 file error. err=%+v", m.UniqueKey, err)
+	if m.enableMinio {
+		if err := m.minioWriter.Write(m.playlistFilename, buf.Bytes()); err != nil {
+			nazalog.Errorf("[%s] write live m3u8 file error. err=%+v", m.UniqueKey, err)
+		}
+	} else {
+		if err := writeM3u8File(buf.Bytes(), m.playlistFilename, m.playlistFilenameBak); err != nil {
+			nazalog.Errorf("[%s] write live m3u8 file error. err=%+v", m.UniqueKey, err)
+		}
 	}
 }
 

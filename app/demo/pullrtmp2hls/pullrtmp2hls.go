@@ -1,32 +1,37 @@
-// Copyright 2020, Chef.  All rights reserved.
-// https://github.com/yangjing0630/go-stream
-//
-// Use of this source code is governed by a MIT-style license
-// that can be found in the License file.
-//
-// Author: Chef (191201771@qq.com)
-
 package main
 
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 
+	"github.com/q191201771/naza/pkg/nazalog"
 	"github.com/yangjing0630/go-stream/pkg/base"
 	"github.com/yangjing0630/go-stream/pkg/hls"
 	"github.com/yangjing0630/go-stream/pkg/rtmp"
-	"github.com/q191201771/naza/pkg/nazalog"
 )
 
-func main() {
-	_ = nazalog.Init(func(option *nazalog.Option) {
-		option.AssertBehavior = nazalog.AssertFatal
-	})
-	defer nazalog.Sync()
+var TaskMap sync.Map
 
-	url, hlsOutPath, fragmentDurationMs, fragmentNum := parseFlag()
+type TaskInfo struct {
+	ps *rtmp.PullSession
+}
+
+func startTask(w http.ResponseWriter, r *http.Request) {
+	rtmpUrl := r.FormValue("rtmpUrl")
+	taskId := r.FormValue("taskId")
+	if rtmpUrl == "" && taskId == "" {
+		fmt.Fprintf(w, "参数为空\n")
+		return
+	}
+	go pullRtmp2Hls(rtmpUrl, "", 3000, 6, taskId)
+	fmt.Fprintf(w, "success!!\n")
+}
+
+func pullRtmp2Hls(url string, hlsOutPath string, fragmentDurationMs int, fragmentNum int, taskId string) {
 	nazalog.Infof("parse flag succ. url=%s, hlsOutPath=%s, fragmentDurationMs=%d, fragmentNum=%d",
 		url, hlsOutPath, fragmentDurationMs, fragmentNum)
 
@@ -35,7 +40,6 @@ func main() {
 		FragmentDurationMs: fragmentDurationMs,
 		FragmentNum:        fragmentNum,
 	}
-
 	ctx, err := base.ParseRtmpUrl(url)
 	if err != nil {
 		nazalog.Fatalf("parse rtmp url failed. url=%s, err=%+v", url, err)
@@ -52,12 +56,50 @@ func main() {
 	err = pullSession.Pull(url, func(msg base.RtmpMsg) {
 		hlsMuexer.FeedRtmpMessage(msg)
 	})
-
+	TaskMap.Store(taskId, TaskInfo{
+		ps: pullSession,
+	})
 	if err != nil {
 		nazalog.Fatalf("pull rtmp failed. err=%+v", err)
 	}
-	err = <-pullSession.WaitChan()
-	nazalog.Errorf("< session.Wait [%s] err=%+v", pullSession.UniqueKey(), err)
+	//err = <-pullSession.WaitChan()
+	select {
+	case err = <-pullSession.WaitChan():
+		TaskMap.Delete(taskId)
+		nazalog.Errorf("< session.Wait [%s] err=%+v", pullSession.UniqueKey(), err)
+		return
+	}
+}
+
+func stopTask(w http.ResponseWriter, r *http.Request) {
+	taskId := r.FormValue("taskId")
+	value, ok := TaskMap.Load(taskId)
+	if ok && value != nil {
+		taskInfo := value.(TaskInfo)
+		if err := taskInfo.ps.Dispose(); err != nil {
+			fmt.Fprintf(w, "卧槽 结束流失败")
+			return
+		}
+	}
+	TaskMap.Range(func(key, value interface{}) bool {
+		fmt.Println("Key =", key, "Value =", value)
+		return true
+	})
+	fmt.Fprintf(w, "%v is %v", value, ok)
+}
+
+func main() {
+	_ = nazalog.Init(func(option *nazalog.Option) {
+		option.AssertBehavior = nazalog.AssertFatal
+	})
+	defer nazalog.Sync()
+
+	http.HandleFunc("/startTask", startTask)
+	http.HandleFunc("/stopTask", stopTask)
+
+	http.ListenAndServe(":9898", nil)
+
+	return
 }
 
 func parseFlag() (url string, hlsOutPath string, fragmentDurationMs int, fragmentNum int) {
